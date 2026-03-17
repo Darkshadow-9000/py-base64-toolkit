@@ -7,8 +7,6 @@ def manual_encode(data):
     Encode text to Base64 manually.
     Supports UTF-8 encoded text with multi-byte characters.
     """
-    # 1. Convert text to bytes, then to an 8-bit binary string
-    # This handles UTF-8 characters (emojis, accents, etc.)
     if isinstance(data, str):
         data_bytes = data.encode('utf-8')
     else:
@@ -18,21 +16,15 @@ def manual_encode(data):
     for byte in data_bytes:
         binary_str += format(byte, "08b")
 
-    # 2. Add '0' bits to make the TOTAL length a multiple of 6
-    # This ensures the last character isn't cut off
     padding_bits = (6 - len(binary_str) % 6) % 6
     binary_str += "0" * padding_bits
 
-    # 3. Convert 6-bit chunks into Base64 characters
     encoded = ""
     for i in range(0, len(binary_str), 6):
         chunk = binary_str[i : i + 6]
         encoded += ALPHABET[int(chunk, 2)]
 
-    # 4. The Correct Padding Logic:
-    # Instead of slicing[:-1], we check how many bytes were in the original
-    # 1 byte left over -> needs 2 padding characters (==)
-    # 2 bytes left over -> needs 1 padding character (=)
+    # Correct padding logic: check how many bytes were in the original
     if len(data_bytes) % 3 == 1:
         encoded += "=="
     elif len(data_bytes) % 3 == 2:
@@ -48,7 +40,6 @@ def manual_decode(data):
     if not isinstance(data, str):
         raise TypeError("Input must be a string")
     
-    # Validate Base64 characters
     for char in data.rstrip("="):
         if char not in ALPHABET:
             raise ValueError(f"Invalid Base64 character: '{char}'")
@@ -68,11 +59,9 @@ def manual_decode(data):
         if len(byte) == 8:
             decoded_bytes.append(int(byte, 2))
 
-    # Remove padding effect
     if padding:
         decoded_bytes = decoded_bytes[:-padding]
 
-    # Decode bytes to UTF-8 string
     try:
         decoded_str = decoded_bytes.decode('utf-8')
     except UnicodeDecodeError:
@@ -93,13 +82,10 @@ Flags:
     """
 )
 
-
-# --- Command Line Logic ---
-# 1. Check if -n is present anywhere in the arguments
+# Check if -n flag is present
 no_newline = "-n" in sys.argv
 
-# 2. Filter out the script name AND the -n flag to find our command and text
-# This leaves us with a clean list of just the meaningful parts
+# Filter out script name and -n flag
 clean_args = [arg for arg in sys.argv[1:] if arg != "-n"]
 
 if len(clean_args) < 1 or clean_args[0] in ["-h", "--help"]:
@@ -108,12 +94,9 @@ elif len(clean_args) < 2:
     print("[-] Error: Missing text. See --help")
 else:
     flag = clean_args[0]
-    # Grab all remaining arguments as the text to handle spaces automatically
     text = " ".join(clean_args[1:])
 
     if flag in ["-e", "--encode"]:
-        # The Trick: If NO -n is present, add the newline to match 'echo'
-        # If -n IS present, leave the text exactly as it is.
         final_input = text if no_newline else text + "\n"
         try:
             print(f"Result: {manual_encode(final_input)}")
@@ -122,7 +105,6 @@ else:
 
     elif flag in ["-d", "--decode"]:
         try:
-            # We strip the text for decoding to avoid math errors from trailing spaces
             print(f"Result: {manual_decode(text.strip())}")
         except ValueError as e:
             print(f"[-] Error: {e}")
