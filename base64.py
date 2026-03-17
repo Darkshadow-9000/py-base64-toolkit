@@ -2,15 +2,24 @@ import sys
 
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-
 def manual_encode(data):
-    # 1. Convert everything to an 8-bit binary string
+    """
+    Encode text to Base64 manually.
+    Supports UTF-8 encoded text with multi-byte characters.
+    """
+    # 1. Convert text to bytes, then to an 8-bit binary string
+    # This handles UTF-8 characters (emojis, accents, etc.)
+    if isinstance(data, str):
+        data_bytes = data.encode('utf-8')
+    else:
+        data_bytes = data
+    
     binary_str = ""
-    for char in data:
-        binary_str += format(ord(char), "08b")
+    for byte in data_bytes:
+        binary_str += format(byte, "08b")
 
     # 2. Add '0' bits to make the TOTAL length a multiple of 6
-    # This ensures the last character (like the 'o' in Hello) isn't cut off
+    # This ensures the last character isn't cut off
     padding_bits = (6 - len(binary_str) % 6) % 6
     binary_str += "0" * padding_bits
 
@@ -21,18 +30,29 @@ def manual_encode(data):
         encoded += ALPHABET[int(chunk, 2)]
 
     # 4. The Correct Padding Logic:
-    # Instead of slicing [:-1], we check how many bytes were in the original
+    # Instead of slicing[:-1], we check how many bytes were in the original
     # 1 byte left over -> needs 2 padding characters (==)
     # 2 bytes left over -> needs 1 padding character (=)
-    if len(data) % 3 == 1:
+    if len(data_bytes) % 3 == 1:
         encoded += "=="
-    elif len(data) % 3 == 2:
+    elif len(data_bytes) % 3 == 2:
         encoded += "="
 
     return encoded
 
-
 def manual_decode(data):
+    """
+    Decode Base64 string back to text.
+    Properly handles UTF-8 multi-byte characters.
+    """
+    if not isinstance(data, str):
+        raise TypeError("Input must be a string")
+    
+    # Validate Base64 characters
+    for char in data.rstrip("="):
+        if char not in ALPHABET:
+            raise ValueError(f"Invalid Base64 character: '{char}'")
+    
     padding = data.count("=")
     clean_data = data.rstrip("=")
 
@@ -41,33 +61,37 @@ def manual_decode(data):
         index = ALPHABET.index(char)
         binary_str += format(index, "06b")
 
-    decoded_bytes = []
+    decoded_bytes = bytearray()
 
     for i in range(0, len(binary_str), 8):
         byte = binary_str[i : i + 8]
         if len(byte) == 8:
-            decoded_bytes.append(chr(int(byte, 2)))
+            decoded_bytes.append(int(byte, 2))
 
-    decoded_str = "".join(decoded_bytes)
-
-    # remove padding effect
+    # Remove padding effect
     if padding:
-        decoded_str = decoded_str[:-padding]
+        decoded_bytes = decoded_bytes[:-padding]
+
+    # Decode bytes to UTF-8 string
+    try:
+        decoded_str = decoded_bytes.decode('utf-8')
+    except UnicodeDecodeError:
+        raise ValueError("Decoded data is not valid UTF-8")
 
     return decoded_str
-
 
 def show_help():
     print("""
 Base64 Manual Tool (No Libraries)
-Usage: python3 manual_b64.py [FLAG] [TEXT]
+Usage: python3 base64.py [FLAG] [TEXT]
 
 Flags:
   -e, --encode    Convert plain text to Base64
   -d, --decode    Convert Base64 string back to plain text
   -h, --help      Show this manual
   -n              no newline
-    """)
+    """
+)
 
 
 # --- Command Line Logic ---
@@ -91,13 +115,18 @@ else:
         # The Trick: If NO -n is present, add the newline to match 'echo'
         # If -n IS present, leave the text exactly as it is.
         final_input = text if no_newline else text + "\n"
-        print(f"Result: {manual_encode(final_input)}")
+        try:
+            print(f"Result: {manual_encode(final_input)}")
+        except Exception as e:
+            print(f"[-] Error during encoding: {e}")
 
     elif flag in ["-d", "--decode"]:
         try:
             # We strip the text for decoding to avoid math errors from trailing spaces
             print(f"Result: {manual_decode(text.strip())}")
-        except ValueError:
-            print("[-] Error: Invalid Base64 character provided.")
+        except ValueError as e:
+            print(f"[-] Error: {e}")
+        except TypeError as e:
+            print(f"[-] Error: {e}")
     else:
         show_help()
